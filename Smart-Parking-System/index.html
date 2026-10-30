@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automated Parking System using Arduino - College Mini-Project Demo</title>
+  <meta name="description" content="Interactive 2.5D web simulation of an Automated Parking System using Arduino Uno, IR sensors, Servo Motor Gate, 16x2 LCD, LEDs, and Buzzer. Built for college project presentation.">
+  
+  <!-- Google Fonts: Inter, JetBrains Mono, VT323 (for LCD) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=VT323&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- TOP HEADER / PRESENTATION BAR -->
+    <header class="main-header">
+      <div class="header-brand">
+        <div class="microcontroller-icon">
+          <i class="fa-solid fa-microchip"></i>
+        </div>
+        <div>
+          <h1 class="project-title">Automated Parking System</h1>
+          <p class="project-subtitle">Arduino Uno & IR Sensor Prototype • College Mini-Project Demo</p>
+        </div>
+      </div>
+      
+      <div class="header-controls">
+        <button id="tourBtn" class="btn btn-outline" title="Start Guided Tour for Presentation">
+          <i class="fa-solid fa-graduation-cap"></i> Demo Presentation Mode
+        </button>
+        <button id="soundToggleBtn" class="btn btn-icon" title="Toggle Sound Effects">
+          <i class="fa-solid fa-volume-high" id="soundIcon"></i>
+        </button>
+        <button id="resetAllBtn" class="btn btn-danger" title="Reset All Parking Slots">
+          <i class="fa-solid fa-rotate-left"></i> Reset System
+        </button>
+      </div>
+    </header>
+    <!-- MAIN DASHBOARD CONTENT -->
+    <main class="dashboard-grid">
+      
+      <!-- LEFT COLUMN: CONTROL DASHBOARD & ACTION CENTER -->
+      <aside class="dashboard-sidebar card">
+        <div class="card-header">
+          <h2><i class="fa-solid fa-sliders"></i> Control Dashboard</h2>
+          <span class="badge badge-success" id="systemReadyBadge"><i class="fa-solid fa-circle"></i> System Ready</span>
+        </div>
+        <!-- Interactive Triggers -->
+        <div class="control-group">
+          <label class="control-label">Simulation Actions</label>
+          
+          <button id="arriveBtn" class="btn btn-primary btn-lg btn-block pulse-animation">
+            <i class="fa-solid fa-car-side"></i> Vehicle Arrives
+          </button>
+          <div class="car-selector-wrapper">
+            <label for="carColorSelect"><i class="fa-solid fa-palette"></i> Vehicle Color:</label>
+            <select id="carColorSelect" class="select-input">
+              <option value="#3b82f6">Cyan Blue Sedan</option>
+              <option value="#ef4444">Crimson Red Sports</option>
+              <option value="#10b981">Emerald Taxi</option>
+              <option value="#f59e0b">Amber Convertible</option>
+              <option value="#8b5cf6">Purple SUV</option>
+            </select>
+          </div>
+        </div>
+        <div class="control-divider"></div>
+        <!-- Vehicle Exit Controls -->
+        <div class="control-group">
+          <label class="control-label">Vehicle Departure (Exit)</label>
+          <div class="exit-btn-grid">
+            <button id="exitS1Btn" class="btn btn-secondary btn-sm" disabled>
+              <i class="fa-solid fa-arrow-right-from-bracket"></i> Exit Slot 1
+            </button>
+            <button id="exitS2Btn" class="btn btn-secondary btn-sm" disabled>
+              <i class="fa-solid fa-arrow-right-from-bracket"></i> Exit Slot 2
+            </button>
+            <button id="exitS3Btn" class="btn btn-secondary btn-sm" disabled>
+              <i class="fa-solid fa-arrow-right-from-bracket"></i> Exit Slot 3
+            </button>
+          </div>
+          <button id="autoExitBtn" class="btn btn-outline btn-block mt-2">
+            <i class="fa-solid fa-car-tunnel"></i> Auto-Exit First Vehicle
+          </button>
+        </div>
+        <div class="control-divider"></div>
+        <!-- Signal Flow Legend & Hardware Pin Reference -->
+        <div class="hardware-pins-card">
+          <h3><i class="fa-solid fa-diagram-project"></i> Signal Flow & Pins</h3>
+          <div class="flow-diagram">
+            <div class="flow-step">
+              <span class="flow-node sensor-node">IR Sensor</span>
+              <span class="flow-arrow"><i class="fa-solid fa-right-long"></i></span>
+              <span class="flow-node arduino-node">Arduino Uno</span>
+            </div>
+            <div class="flow-step">
+              <span class="flow-node arduino-node">Arduino Uno</span>
+              <span class="flow-arrow"><i class="fa-solid fa-right-long"></i></span>
+              <span class="flow-node actuator-node">Servo / LCD / LEDs</span>
+            </div>
+          </div>
+          <ul class="pin-list">
+            <li><span class="pin-badge pin-digital">D2</span> Entrance IR Sensor</li>
+            <li><span class="pin-badge pin-digital">D3, D4, D5</span> Slot 1, 2, 3 IR Sensors</li>
+            <li><span class="pin-badge pin-pwm">D9</span> Servo Gate PWM</li>
+            <li><span class="pin-badge pin-digital">D10</span> Piezo Alert Buzzer</li>
+            <li><span class="pin-badge pin-i2c">A4/A5</span> 16x2 LCD (I2C SDA/SCL)</li>
+            <li><span class="pin-badge pin-digital">D6-D13</span> Slot Status LEDs</li>
+          </ul>
+        </div>
+      </aside>
+      <!-- CENTER COLUMN: PARKING LOT ARENA & VISUALIZER -->
+      <section class="dashboard-main card">
+        <div class="card-header main-view-header">
+          <div class="view-title">
+            <h2><i class="fa-solid fa-square-parking"></i> Parking Area & Gate Prototype</h2>
+            <span class="badge badge-info" id="viewModeBadge">2.5D Isometric Mode</span>
+          </div>
+          
+          <div class="view-tabs">
+            <button id="tabIsoBtn" class="tab-btn active"><i class="fa-solid fa-cubes"></i> 3D / Isometric View</button>
+            <button id="tabSchematicBtn" class="tab-btn"><i class="fa-solid fa-network-wired"></i> Wiring Schematic</button>
+          </div>
+        </div>
+        <!-- VISUALIZATION CANVAS ARENA -->
+        <div class="view-container">
+          
+          <!-- 1. ISOMETRIC PARKING ARENA VIEW -->
+          <div id="isoParkingArena" class="view-pane active-pane">
+            <div class="isometric-stage">
+              
+              <!-- ENTRANCE ROAD & BARRIER GATE -->
+              <div class="entrance-zone">
+                <div class="road-surface">
+                  <div class="road-lane-line"></div>
+                  <div class="stop-line"></div>
+                  <div class="road-direction-arrow"><i class="fa-solid fa-chevron-up"></i></div>
+                </div>
+                <!-- IR Entrance Sensor Assembly -->
+                <div class="ir-sensor-post" id="entranceSensorPost" title="IR Entrance Sensor (Pin D2)">
+                  <div class="ir-housing">
+                    <span class="ir-lens ir-tx"></span>
+                    <span class="ir-lens ir-rx"></span>
+                  </div>
+                  <div class="ir-laser-beam" id="entranceLaserBeam"></div>
+                  <div class="sensor-label">Entrance IR Sensor</div>
+                </div>
+                <!-- Servo Gate Barrier Assembly -->
+                <div class="servo-gate-assembly">
+                  <div class="servo-motor-box" title="Servo Motor (Pin D9)">
+                    <div class="servo-axle"></div>
+                    <span class="servo-status-dot" id="servoStatusDot"></span>
+                    <span class="servo-label">Servo Motor</span>
+                  </div>
+                  <div class="barrier-arm-wrapper">
+                    <div class="barrier-arm" id="servoBarrierArm">
+                      <div class="arm-stripes"></div>
+                      <span class="arm-led" id="armLed"></span>
+                    </div>
+                  </div>
+                  <div class="gate-angle-badge" id="gateAngleDisplay">0° CLOSED</div>
+                </div>
+              </div>
+              <!-- PARKING SLOTS AREA -->
+              <div class="parking-slots-grid">
+                
+                <!-- SLOT 1 -->
+                <div class="parking-slot" id="slotCard1" data-slot="1">
+                  <div class="slot-header">
+                    <span class="slot-name">SLOT 1</span>
+                    <span class="slot-led-indicator green" id="ledSlot1"></span>
+                  </div>
+                  <div class="slot-bay">
+                    <div class="slot-lines"></div>
+                    <div class="slot-ir-sensor" id="sensorSlot1" title="Slot 1 IR Sensor (Pin D3)">
+                      <div class="mini-ir-beam" id="beamSlot1"></div>
+                      <span class="sensor-mini-label">IR 1</span>
+                    </div>
+                    
+                    <!-- Vehicle Container -->
+                    <div class="vehicle-spot" id="vehicleSpot1">
+                      <!-- Dynamically filled with car SVG -->
+                    </div>
+                  </div>
+                  <div class="slot-status-footer" id="statusTextSlot1">
+                    <i class="fa-solid fa-circle-check"></i> AVAILABLE
+                  </div>
+                </div>
+                <!-- SLOT 2 -->
+                <div class="parking-slot" id="slotCard2" data-slot="2">
+                  <div class="slot-header">
+                    <span class="slot-name">SLOT 2</span>
+                    <span class="slot-led-indicator green" id="ledSlot2"></span>
+                  </div>
+                  <div class="slot-bay">
+                    <div class="slot-lines"></div>
+                    <div class="slot-ir-sensor" id="sensorSlot2" title="Slot 2 IR Sensor (Pin D4)">
+                      <div class="mini-ir-beam" id="beamSlot2"></div>
+                      <span class="sensor-mini-label">IR 2</span>
+                    </div>
+                    
+                    <!-- Vehicle Container -->
+                    <div class="vehicle-spot" id="vehicleSpot2"></div>
+                  </div>
+                  <div class="slot-status-footer" id="statusTextSlot2">
+                    <i class="fa-solid fa-circle-check"></i> AVAILABLE
+                  </div>
+                </div>
+                <!-- SLOT 3 -->
+                <div class="parking-slot" id="slotCard3" data-slot="3">
+                  <div class="slot-header">
+                    <span class="slot-name">SLOT 3</span>
+                    <span class="slot-led-indicator green" id="ledSlot3"></span>
+                  </div>
+                  <div class="slot-bay">
+                    <div class="slot-lines"></div>
+                    <div class="slot-ir-sensor" id="sensorSlot3" title="Slot 3 IR Sensor (Pin D5)">
+                      <div class="mini-ir-beam" id="beamSlot3"></div>
+                      <span class="sensor-mini-label">IR 3</span>
+                    </div>
+                    
+                    <!-- Vehicle Container -->
+                    <div class="vehicle-spot" id="vehicleSpot3"></div>
+                  </div>
+                  <div class="slot-status-footer" id="statusTextSlot3">
+                    <i class="fa-solid fa-circle-check"></i> AVAILABLE
+                  </div>
+                </div>
+              </div>
+              <!-- ANIMATED MOVING CAR CONTAINER -->
+              <div id="movingCarContainer" class="moving-car-node hidden">
+                <div class="car-sprite" id="movingCarSprite">
+                  <div class="car-body-fill"></div>
+                  <div class="car-windshield"></div>
+                  <div class="car-headlights"></div>
+                  <div class="car-taillights"></div>
+                  <div class="car-wheels">
+                    <span class="wheel front-l"></span>
+                    <span class="wheel front-r"></span>
+                    <span class="wheel rear-l"></span>
+                    <span class="wheel rear-r"></span>
+                  </div>
+                </div>
+              </div>
+              <!-- SIGNAL PULSE ANIMATION OVERLAY -->
+              <div class="signal-bus-lines">
+                <svg width="100%" height="100%" id="signalSvg">
+                  <path id="pathEntranceToArduino" class="signal-path" d="" />
+                  <path id="pathArduinoToServo" class="signal-path" d="" />
+                  <path id="pathArduinoToLCD" class="signal-path" d="" />
+                </svg>
+              </div>
+            </div>
+          </div>
+          <!-- 2. WIRING SCHEMATIC DIAGRAM VIEW -->
+          <div id="schematicArena" class="view-pane">
+            <div class="schematic-board">
+              <div class="schematic-header">
+                <h3>Hardware Wiring Schematic Diagram</h3>
+                <p>Arduino Uno microcontroller connected to 4x TCRT5000 IR Sensors, SG90 Servo Motor, 16x2 I2C LCD Display, 3x Status LEDs & Piezo Buzzer</p>
+              </div>
+              
+              <div class="schematic-layout">
+                <!-- Arduino Center -->
+                <div class="schematic-component arduino-comp">
+                  <div class="comp-title"><i class="fa-solid fa-microchip"></i> Arduino Uno R3</div>
+                  <div class="comp-pins">
+                    <span class="pin-tag pin-active-tag" id="schPinD2">D2: Entrance IR</span>
+                    <span class="pin-tag" id="schPinD3">D3: Slot 1 IR</span>
+                    <span class="pin-tag" id="schPinD4">D4: Slot 2 IR</span>
+                    <span class="pin-tag" id="schPinD5">D5: Slot 3 IR</span>
+                    <span class="pin-tag" id="schPinD9">D9: Servo Gate PWM</span>
+                    <span class="pin-tag" id="schPinD10">D10: Buzzer Alert</span>
+                    <span class="pin-tag">A4/A5: I2C LCD</span>
+                  </div>
+                </div>
+                <!-- Peripherals Around -->
+                <div class="schematic-grid">
+                  <div class="schematic-component">
+                    <div class="comp-title"><i class="fa-solid fa-eye"></i> IR Entrance Sensor</div>
+                    <p class="comp-desc">Active LOW signal on vehicle beam break</p>
+                    <div class="comp-val" id="schEntranceVal">5V HIGH (Clear)</div>
+                  </div>
+                  
+                  <div class="schematic-component">
+                    <div class="comp-title"><i class="fa-solid fa-gears"></i> SG90 Servo Motor</div>
+                    <p class="comp-desc">PWM Angle: 0° (Closed) / 90° (Open)</p>
+                    <div class="comp-val" id="schServoVal">0° (Closed)</div>
+                  </div>
+                  <div class="schematic-component">
+                    <div class="comp-title"><i class="fa-solid fa-tv"></i> 16x2 LCD Display</div>
+                    <p class="comp-desc">I2C Address: 0x27</p>
+                    <div class="comp-val" id="schLcdVal">"SMART PARKING"</div>
+                  </div>
+                  <div class="schematic-component">
+                    <div class="comp-title"><i class="fa-solid fa-bullhorn"></i> Piezo Buzzer</div>
+                    <p class="comp-desc">Parking Full Alarm (Active High)</p>
+                    <div class="comp-val" id="schBuzzerVal">OFF</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <!-- RIGHT COLUMN: HARDWARE SIMULATION WORKBENCH -->
+      <aside class="dashboard-workbench card">
+        
+        <!-- 16x2 LCD DISPLAY UNIT -->
+        <div class="lcd-unit-card">
+          <div class="unit-header">
+            <h3><i class="fa-solid fa-tv"></i> LCD Display (16x2 I2C)</h3>
+            <div class="lcd-theme-selector">
+              <button class="theme-dot theme-blue active" data-theme="blue" title="Blue Backlight"></button>
+              <button class="theme-dot theme-green" data-theme="green" title="Green Backlight"></button>
+            </div>
+          </div>
+          <div class="lcd-screen-container blue-backlight" id="lcdScreen">
+            <div class="lcd-grid-overlay"></div>
+            <div class="lcd-line lcd-line-1" id="lcdLine1">SMART PARKING</div>
+            <div class="lcd-line lcd-line-2" id="lcdLine2">Available: 3</div>
+          </div>
+        </div>
+        <!-- ARDUINO UNO HARDWARE BOARD GRAPHIC -->
+        <div class="arduino-board-card">
+          <div class="unit-header">
+            <h3><i class="fa-solid fa-microchip"></i> Arduino Uno Board</h3>
+            <span class="power-led-badge"><span class="led-dot green-glow"></span> PWR ON</span>
+          </div>
+          <div class="arduino-board-svg">
+            <div class="board-pcb">
+              <div class="board-logo">Arduino Uno</div>
+              <div class="atmega-chip">ATmega328P</div>
+              <div class="crystal-oscillator">16.0MHz</div>
+              
+              <div class="tx-rx-leds">
+                <span class="board-sm-led" id="ledTx">TX</span>
+                <span class="board-sm-led" id="ledRx">RX</span>
+                <span class="board-sm-led" id="ledPin13">L</span>
+              </div>
+              <div class="pin-headers digital-headers">
+                <span class="pin-item" id="pinH_2">2</span>
+                <span class="pin-item" id="pinH_3">3</span>
+                <span class="pin-item" id="pinH_4">4</span>
+                <span class="pin-item" id="pinH_5">5</span>
+                <span class="pin-item" id="pinH_9">9</span>
+                <span class="pin-item" id="pinH_10">10</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- BUZZER ALERT MODULE -->
+        <div class="buzzer-card" id="buzzerCard">
+          <div class="buzzer-graphics">
+            <div class="buzzer-speaker" id="buzzerSpeaker">
+              <i class="fa-solid fa-volume-high"></i>
+            </div>
+            <div class="buzzer-waves" id="buzzerWaves">
+              <span class="wave w1"></span>
+              <span class="wave w2"></span>
+              <span class="wave w3"></span>
+            </div>
+          </div>
+          <div class="buzzer-info">
+            <div class="buzzer-title">PIEZO ALARM BUZZER</div>
+            <div class="buzzer-state" id="buzzerStateText">STATUS: INACTIVE</div>
+          </div>
+        </div>
+        <!-- SYSTEM STATUS PANEL -->
+        <div class="status-panel-card">
+          <div class="unit-header">
+            <h3><i class="fa-solid fa-list-check"></i> Real-time System Status</h3>
+          </div>
+          <div class="status-table">
+            <div class="status-row">
+              <span class="status-label">Servo Gate</span>
+              <span class="status-val badge badge-closed" id="sysGateStatus">CLOSED (0°)</span>
+            </div>
+            <div class="status-row">
+              <span class="status-label">Entrance Sensor</span>
+              <span class="status-val badge badge-neutral" id="sysEntranceStatus">NO VEHICLE</span>
+            </div>
+            <div class="status-row">
+              <span class="status-label">Slot 1 (Pin D3)</span>
+              <span class="status-val badge badge-success" id="sysSlot1Status">AVAILABLE</span>
+            </div>
+            <div class="status-row">
+              <span class="status-label">Slot 2 (Pin D4)</span>
+              <span class="status-val badge badge-success" id="sysSlot2Status">AVAILABLE</span>
+            </div>
+            <div class="status-row">
+              <span class="status-label">Slot 3 (Pin D5)</span>
+              <span class="status-val badge badge-success" id="sysSlot3Status">AVAILABLE</span>
+            </div>
+          </div>
+          <!-- Capacity Counter -->
+          <div class="tally-box">
+            <div class="tally-item">
+              <span class="tally-num" id="tallyTotal">3</span>
+              <span class="tally-lbl">Total Slots</span>
+            </div>
+            <div class="tally-item">
+              <span class="tally-num text-danger" id="tallyOccupied">0</span>
+              <span class="tally-lbl">Occupied</span>
+            </div>
+            <div class="tally-item">
+              <span class="tally-num text-success" id="tallyAvailable">3</span>
+              <span class="tally-lbl">Available</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+    <!-- BOTTOM PANEL: ARDUINO C++ CODE & SERIAL MONITOR TERMINAL -->
+    <footer class="bottom-workbench card">
+      <div class="workbench-tabs">
+        <button id="tabCodeBtn" class="tab-btn active"><i class="fa-solid fa-code"></i> Arduino C++ Code (.ino)</button>
+        <button id="tabSerialBtn" class="tab-btn"><i class="fa-solid fa-terminal"></i> Serial Monitor Output (9600 Baud)</button>
+      </div>
+      <div class="workbench-content">
+        <!-- CODE VIEW -->
+        <div id="codePane" class="tab-pane active-pane">
+          <div class="code-editor-wrapper">
+            <pre><code id="codeContainer" class="language-cpp">Loading Arduino sketch...</code></pre>
+          </div>
+        </div>
+        <!-- SERIAL MONITOR VIEW -->
+        <div id="serialPane" class="tab-pane">
+          <div class="terminal-wrapper">
+            <div class="terminal-header">
+              <span>COM4 • 9600 Baud • Connected</span>
+              <button id="clearSerialBtn" class="btn btn-sm btn-outline"><i class="fa-solid fa-trash"></i> Clear</button>
+            </div>
+            <div class="terminal-body" id="serialTerminal">
+              <div class="terminal-line system-line">[0.00s] Arduino Uno Initialized.</div>
+              <div class="terminal-line system-line">[0.02s] LiquidCrystal_I2C initialized at 0x27.</div>
+              <div class="terminal-line system-line">[0.05s] Gate Servo calibrated to 0 degrees.</div>
+              <div class="terminal-line system-line">[0.10s] System Ready. Waiting for vehicles...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+    <!-- GUIDED PRESENTATION MODAL OVERLAY -->
+    <div id="presentationModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2><i class="fa-solid fa-graduation-cap"></i> College Mini-Project Walkthrough Guide</h2>
+          <button id="closeModalBtn" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="tour-step active" data-step="1">
+            <h3>1. Project Working Principle</h3>
+            <p>This automated parking system utilizes an <strong>Arduino Uno</strong> microcontroller as the central brain. It constantly monitors infrared (IR) proximity sensors located at the entrance gate and inside each individual parking slot.</p>
+          </div>
+          <div class="tour-step" data-step="2">
+            <h3>2. Vehicle Entry & Barrier Automation</h3>
+            <p>When a vehicle arrives at the entrance, the <strong>Entrance IR Sensor (Pin D2)</strong> beam is interrupted. The Arduino checks the available slot count:</p>
+            <ul>
+              <li>If <strong>Available &gt; 0</strong>: Arduino sends PWM signal to <strong>Servo Motor (Pin D9)</strong> to rotate the barrier gate open (90°), updates the 16x2 LCD screen, and guides the car into the first vacant slot.</li>
+              <li>If <strong>Available == 0</strong>: Arduino triggers the <strong>Piezo Alert Buzzer (Pin D10)</strong>, displays "PARKING FULL" on LCD, and keeps the barrier gate CLOSED.</li>
+            </ul>
+          </div>
+          <div class="tour-step" data-step="3">
+            <h3>3. Real-time Slot Monitoring & LEDs</h3>
+            <p>Each slot contains an independent IR sensor (Pins D3, D4, D5) and status LEDs (Green = Vacant, Red = Occupied). When a car parks over a sensor, the corresponding LED instantly turns RED, and the 16x2 LCD display updates the count dynamically.</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="prevStepBtn" class="btn btn-secondary" disabled>Previous</button>
+          <span id="stepCounterText">Step 1 of 3</span>
+          <button id="nextStepBtn" class="btn btn-primary">Next Step</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- JS MODULES -->
+  <script src="arduino-code.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
